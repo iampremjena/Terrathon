@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -43,23 +45,27 @@ export default function Home() {
   }, [])
 
   const fetchLeaderboard = async () => {
-    const { data, error } = await supabase
-      .from('game_attempts')
-      .select('id, total_time_ms, final_score, completed_at, profiles(username)')
-      .eq('is_official', true)
-      .eq('was_disqualified', false)
-      .order('final_score', { ascending: false })
-      .limit(10)
+    try {
+      const { data, error } = await supabase
+        .from('game_attempts')
+        .select('id, total_time_ms, final_score, completed_at, profiles(username)')
+        .eq('is_official', true)
+        .eq('was_disqualified', false)
+        .order('final_score', { ascending: false })
+        .limit(10)
 
-    if (!error && data) {
-      const formatted = data.map((item: any) => ({
-        id: item.id,
-        username: item.profiles?.username || 'Anonymous',
-        final_score: item.final_score,
-        total_time_ms: item.total_time_ms,
-        completed_at: item.completed_at,
-      }))
-      setLeaderboard(formatted)
+      if (!error && data) {
+        const formatted = data.map((item: any) => ({
+          id: item.id,
+          username: item.profiles?.username || 'Anonymous',
+          final_score: item.final_score,
+          total_time_ms: item.total_time_ms,
+          completed_at: item.completed_at,
+        }))
+        setLeaderboard(formatted)
+      }
+    } catch (e) {
+      console.error('Failed to fetch leaderboard:', e)
     }
   }
 
