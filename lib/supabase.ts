@@ -1,18 +1,33 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// Sanitize inputs to prevent malformed API endpoints
+const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const rawKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-if (typeof window !== 'undefined' && (!supabaseUrl || !supabaseAnonKey)) {
-  console.error(
-    '[TERRATHON BUILD ERROR]: NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY is missing from client bundle.',
-    { supabaseUrl: Boolean(supabaseUrl), supabaseAnonKey: Boolean(supabaseAnonKey) }
-  );
-}
+// Remove trailing slashes and unintended subpaths
+export const supabaseUrl = rawUrl
+  .trim()
+  .replace(/\/+$/, '')
+  .replace(/\/auth\/v1$/, '')
+  .replace(/\/rest\/v1$/, '');
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+// Remove surrounding quotes or spaces
+export const supabaseAnonKey = rawKey.trim().replace(/^["']|["']$/g, '');
+
+export const isSupabaseConfigured = Boolean(
+  supabaseUrl &&
+  supabaseAnonKey &&
+  !supabaseUrl.includes('placeholder')
+);
 
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key'
+  supabaseAnonKey || 'placeholder-key',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  }
 );

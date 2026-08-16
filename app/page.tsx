@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import GameRunner from '@/components/GameRunner';
 import ActivityFeed from '@/components/ActivityFeed';
 import Leaderboard from '@/components/Leaderboard';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 
 const GlobeCanvas = dynamic(() => import('@/components/GlobeCanvas'), {
   ssr: false,
@@ -70,16 +70,24 @@ export default function Home() {
 
   const handleGoogleAuth = async () => {
     if (!isSupabaseConfigured) {
-      alert('Vercel environment variables are missing! Please check Vercel dashboard settings.');
+      alert('Vercel environment variables are missing or invalid.');
       return;
     }
 
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        alert(`Auth Error: ${error.message}`);
+      }
+    } catch (err: any) {
+      alert(`Initialization Error: ${err?.message || 'OAuth failure'}`);
+    }
   };
 
   const handleSignOut = async () => {
@@ -135,12 +143,20 @@ export default function Home() {
             Authenticate with Google
           </button>
 
-          {/* VERCEL ENVIRONMENT DIAGNOSTIC BAR */}
-          <div className="pt-4 border-t border-slate-800/80 flex justify-between items-center text-[10px] font-mono">
-            <span className="text-slate-500">CONFIG STATUS:</span>
-            <span className={isSupabaseConfigured ? "text-emerald-400 font-bold" : "text-rose-400 font-bold animate-pulse"}>
-              {isSupabaseConfigured ? "✓ KEYS LOADED" : "✕ MISSING VERCEL ENV KEYS"}
-            </span>
+          {/* LIVE VERCEL ENVIRONMENT DIAGNOSTIC */}
+          <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl text-left text-[10px] font-mono text-slate-400 space-y-1">
+            <div className="flex justify-between">
+              <span>URL:</span>
+              <span className="text-cyan-400 font-bold truncate max-w-[200px]">
+                {supabaseUrl ? supabaseUrl : 'NOT SET'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>ANON KEY:</span>
+              <span className="text-amber-400 font-bold truncate max-w-[200px]">
+                {supabaseAnonKey ? `${supabaseAnonKey.slice(0, 10)}...` : 'NOT SET'}
+              </span>
+            </div>
           </div>
         </div>
       </main>
