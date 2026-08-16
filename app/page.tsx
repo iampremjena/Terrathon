@@ -6,283 +6,175 @@ import GameRunner from '@/components/GameRunner';
 import ActivityFeed from '@/components/ActivityFeed';
 import Leaderboard from '@/components/Leaderboard';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { useOnlinePresence } from '@/hooks/useOnlinePresence';
 
-const GlobeCanvas = dynamic(() => import('@/components/GlobeCanvas'), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-[520px] bg-slate-950/90 rounded-3xl border border-cyan-500/20 flex flex-col items-center justify-center text-cyan-400 font-mono text-xs gap-3 shadow-[0_0_50px_rgba(6,182,212,0.15)] relative overflow-hidden">
-      <div className="w-12 h-12 border-2 border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin" />
-      <span className="tracking-widest uppercase animate-pulse">Initializing 3D Orbital Projection...</span>
-    </div>
-  ),
-});
+const GlobeCanvas = dynamic(() => import('@/components/GlobeCanvas'), { ssr: false });
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [callsign, setCallsign] = useState<string>('');
+  const [needsUsername, setNeedsUsername] = useState(false);
+  const [usernameInput, setUsernameInput] = useState('');
+  
   const [activeTab, setActiveTab] = useState<'hub' | 'activity' | 'leaderboard'>('hub');
-  const [selectedMode, setSelectedMode] = useState<
-    'capital' | 'videoguessr' | 'trivia' | 'marathon_practice' | 'terrathon_official' | null
-  >(null);
+  const [selectedMode, setSelectedMode] = useState<'capital' | 'photoguessr' | 'trivia' | 'terrathon_official' | null>(null);
 
-  // Real-Time Supabase Presence Tracker
-  const activeAthletesCount = useOnlinePresence(user?.id, callsign);
-
-  // Sync Supabase Auth Session
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        const savedName =
-          session.user.user_metadata?.full_name ||
-          session.user.email?.split('@')[0] ||
-          '';
-        setCallsign(savedName);
+    const checkUser = async (sessionUser: any) => {
+      setUser(sessionUser);
+      if (sessionUser) {
+        // Fetch profile to see if they have a real username set
+        const { data } = await supabase.from('profiles').select('username').eq('id', sessionUser.id).single();
+        if (!data?.username || data.username.startsWith('Runner_')) {
+          setNeedsUsername(true);
+        } else {
+          setCallsign(data.username);
+        }
       }
-    });
+    };
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        const savedName =
-          session.user.user_metadata?.full_name ||
-          session.user.email?.split('@')[0] ||
-          '';
-        setCallsign(savedName);
-      } else {
-        setUser(null);
-        setCallsign('');
-      }
-    });
+    supabase.auth.getSession().then(({ data: { session } }) => checkUser(session?.user));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => checkUser(session?.user));
 
     return () => subscription.unsubscribe();
   }, []);
 
   const handleGoogleAuth = async () => {
-    if (!isSupabaseConfigured) {
-      alert('Vercel environment variables are missing.');
-      return;
-    }
-
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    if (!isSupabaseConfigured) return alert('Vercel environment variables missing.');
+    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth/callback` } });
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setCallsign('');
+  const saveUsername = async () => {
+    if (usernameInput.trim().length < 3) return alert('Username must be at least 3 characters.');
+    await supabase.from('profiles').update({ username: usernameInput }).eq('id', user.id);
+    setCallsign(usernameInput);
+    setNeedsUsername(false);
   };
 
-  // GATEWAY 1: MANDATORY AUTHENTICATION WALL
+  // --- LOGIN SCREEN ---
   if (!user) {
     return (
-      <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6 relative overflow-hidden font-sans">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-40" />
-
-        <div className="relative z-10 bg-slate-900/80 backdrop-blur-2xl border border-slate-800/80 rounded-3xl p-8 sm:p-10 max-w-md w-full text-center shadow-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-400/10 border border-amber-400/30 rounded-full text-amber-300 text-xs font-mono font-bold uppercase tracking-widest mb-6">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            Authentication Required
-          </div>
-
-          <h1 className="text-4xl sm:text-5xl font-black tracking-tighter bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500 bg-clip-text text-transparent mb-2">
-            TERRATHON
-          </h1>
-          <p className="text-slate-400 text-xs font-mono uppercase tracking-wider mb-8">
-            Global Competitive Geography Matrix
-          </p>
-
-          <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-2xl mb-6 text-left space-y-2 font-mono text-xs">
-            <div className="flex justify-between items-center text-slate-400">
-              <span>REALTIME PRESENCE:</span>
-              <span className="text-emerald-400 font-bold">ACTIVE</span>
-            </div>
-            <div className="flex justify-between items-center text-slate-400">
-              <span>LIVE ONLINE ATHLETES:</span>
-              <span className="text-cyan-400 font-bold">{activeAthletesCount} Connected</span>
-            </div>
-          </div>
-
+      <main className="min-h-screen bg-slate-900 flex items-center justify-center p-6 text-white font-sans">
+        <div className="bg-slate-800 p-10 rounded-3xl text-center max-w-sm w-full shadow-2xl border-4 border-slate-700">
+          <div className="text-6xl mb-6">🌍</div>
+          <h1 className="text-5xl font-black tracking-tight mb-2">TERRATHON</h1>
+          <p className="text-slate-400 font-bold mb-8">The Ultimate Geography Game</p>
           <button
             onClick={handleGoogleAuth}
-            className="w-full flex items-center justify-center gap-3 py-4 bg-white hover:bg-slate-100 text-slate-950 font-extrabold rounded-2xl transition shadow-lg hover:scale-[1.02] active:scale-95"
+            className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl transition text-lg shadow-lg"
           >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-            </svg>
-            Authenticate with Google
+            PLAY NOW
           </button>
         </div>
       </main>
     );
   }
 
-  // STAGE 2: FUTURISTIC 3D HUB
-  return (
-    <main className="min-h-screen bg-slate-950 text-white p-4 sm:p-6 max-w-7xl mx-auto relative overflow-hidden font-sans">
-      <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 relative z-10 bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 p-4 sm:p-5 rounded-3xl shadow-xl">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center font-black text-slate-950 text-xl shadow-[0_0_20px_rgba(245,158,11,0.4)]">
-            ⚡
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">TERRATHON</h1>
-              <span className="px-2 py-0.5 bg-amber-400/10 border border-amber-400/30 text-amber-400 font-mono text-[10px] uppercase font-bold rounded">
-                v2.4 Pro
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 font-mono">
-              CALLSIGN: <span className="text-cyan-400 font-bold">{callsign || 'Athlete'}</span>
-            </p>
-          </div>
-        </div>
-
-        {/* Realtime Supabase Presence Telemetry */}
-        <div className="flex items-center gap-6 bg-slate-950/80 border border-slate-800/80 px-4 py-2 rounded-2xl font-mono text-xs">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_#34d399]" />
-            <span className="text-slate-400 uppercase">Live Athletes:</span>
-            <span className="text-amber-400 font-bold text-sm">{activeAthletesCount} Online</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
-          <nav className="flex gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-slate-800/80">
-            <button
-              onClick={() => setActiveTab('hub')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold font-mono transition ${
-                activeTab === 'hub' ? 'bg-amber-400 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              3D HUB
-            </button>
-            <button
-              onClick={() => setActiveTab('activity')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold font-mono transition ${
-                activeTab === 'activity' ? 'bg-amber-400 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              STRAVA LOGS
-            </button>
-            <button
-              onClick={() => setActiveTab('leaderboard')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold font-mono transition ${
-                activeTab === 'leaderboard' ? 'bg-amber-400 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              RANKINGS
-            </button>
-          </nav>
-
-          <button
-            onClick={handleSignOut}
-            className="px-3.5 py-2.5 bg-slate-900 hover:bg-rose-500/10 border border-slate-800 hover:border-rose-500/30 text-slate-400 hover:text-rose-400 rounded-2xl text-xs font-mono font-bold transition"
-          >
-            DISCONNECT
+  // --- USERNAME SETUP MODAL ---
+  if (needsUsername) {
+    return (
+      <main className="min-h-screen bg-slate-900 flex items-center justify-center p-6 text-white font-sans">
+        <div className="bg-slate-800 p-10 rounded-3xl text-center max-w-md w-full shadow-2xl border-4 border-blue-500">
+          <h2 className="text-3xl font-black mb-4">Choose Your Callsign</h2>
+          <p className="text-slate-400 font-bold mb-6">How should you appear on the leaderboard?</p>
+          <input 
+            type="text" 
+            placeholder="Enter username..." 
+            value={usernameInput}
+            onChange={(e) => setUsernameInput(e.target.value)}
+            className="w-full p-4 rounded-xl bg-slate-900 border-2 border-slate-700 text-white font-bold text-center mb-6 focus:border-blue-500 focus:outline-none"
+          />
+          <button onClick={saveUsername} className="w-full py-4 bg-blue-600 hover:bg-blue-500 font-black rounded-xl transition text-lg">
+            SAVE & ENTER
           </button>
         </div>
+      </main>
+    );
+  }
+
+  // --- MAIN GAME LOBBY ---
+  return (
+    <main className="min-h-screen bg-slate-900 text-slate-100 font-sans p-4 sm:p-8">
+      
+      {/* Top Navbar */}
+      <header className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center bg-slate-800 p-4 rounded-3xl mb-8 shadow-lg border-2 border-slate-700">
+        <div className="flex items-center gap-4 mb-4 sm:mb-0">
+          <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-2xl shadow-lg">🌍</div>
+          <div>
+            <h1 className="text-2xl font-black tracking-tight">TERRATHON</h1>
+            <p className="text-sm text-slate-400 font-bold">Welcome, {callsign}</p>
+          </div>
+        </div>
+
+        <nav className="flex gap-2 bg-slate-900 p-1 rounded-xl">
+          {['hub', 'activity', 'leaderboard'].map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab as any)}
+              className={`px-6 py-2 rounded-lg font-black text-sm uppercase transition ${activeTab === tab ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              {tab}
+            </button>
+          ))}
+        </nav>
       </header>
 
-      {/* HUB TAB VIEW */}
-      {activeTab === 'hub' && (
-        <>
-          <div className="mb-6 p-6 bg-gradient-to-r from-amber-500/20 via-slate-900 to-cyan-500/10 border border-amber-400/40 rounded-3xl backdrop-blur-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xl">
-            <div>
-              <span className="px-3 py-1 bg-amber-400 text-slate-950 text-[10px] font-mono font-black rounded-md uppercase tracking-widest mb-2 inline-block">
-                🏆 Sanctioned World Event
-              </span>
-              <h2 className="text-2xl font-black text-white tracking-tight">Real Terrathon Championship Run</h2>
-              <p className="text-slate-300 text-xs mt-0.5">
-                Official 30-question timed challenge (10 Capitals + 10 VideoGuessrs + 10 GeoTrivias).
-              </p>
+      {/* Main Content Area */}
+      <div className="max-w-6xl mx-auto">
+        {activeTab === 'hub' && (
+          <div className="space-y-8">
+            
+            {/* Hero Main Game Card */}
+            <div className="bg-gradient-to-br from-blue-900 to-slate-800 p-8 rounded-3xl border-4 border-blue-500 flex flex-col md:flex-row items-center justify-between shadow-2xl relative overflow-hidden">
+              <div className="absolute inset-0 opacity-20 pointer-events-none"><GlobeCanvas /></div>
+              <div className="relative z-10 mb-6 md:mb-0 text-center md:text-left">
+                <span className="bg-blue-500 text-white font-black px-3 py-1 rounded-lg text-xs tracking-widest uppercase mb-3 inline-block">Official Run</span>
+                <h2 className="text-4xl font-black mb-2">The Terrathon</h2>
+                <p className="text-slate-300 font-bold max-w-md">The ultimate 30-question gauntlet. Capitals, Map Pinpoints, and Trivia.</p>
+              </div>
+              <button
+                onClick={() => setSelectedMode('terrathon_official')}
+                className="relative z-10 px-10 py-5 bg-white text-blue-900 hover:bg-slate-100 font-black rounded-2xl text-xl transition transform hover:scale-105 shadow-xl"
+              >
+                PLAY NOW
+              </button>
             </div>
-            <button
-              onClick={() => setSelectedMode('terrathon_official')}
-              className="px-8 py-4 bg-amber-400 text-slate-950 font-black text-sm rounded-2xl hover:bg-amber-300 transition shadow-lg whitespace-nowrap hover:scale-105 active:scale-95"
-            >
-              LAUNCH TERRATHON →
-            </button>
+
+            {/* Practice Modes */}
+            <div>
+              <h3 className="text-xl font-black text-slate-400 mb-4 tracking-wide uppercase">Practice Modes</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                <button onClick={() => setSelectedMode('capital')} className="bg-slate-800 p-6 rounded-3xl border-2 border-slate-700 hover:border-blue-500 transition text-left group">
+                  <div className="text-4xl mb-4 group-hover:scale-110 transition-transform">🏛️</div>
+                  <h4 className="text-xl font-black text-white">Capitals</h4>
+                  <p className="text-slate-400 text-sm font-bold mt-1">10 quick-fire capital city matches.</p>
+                </button>
+
+                <button onClick={() => setSelectedMode('photoguessr')} className="bg-slate-800 p-6 rounded-3xl border-2 border-slate-700 hover:border-blue-500 transition text-left group">
+                  <div className="text-4xl mb-4 group-hover:scale-110 transition-transform">📍</div>
+                  <h4 className="text-xl font-black text-white">MapGuessr</h4>
+                  <p className="text-slate-400 text-sm font-bold mt-1">Drop a pin on the map to guess the photo location.</p>
+                </button>
+
+                <button onClick={() => setSelectedMode('trivia')} className="bg-slate-800 p-6 rounded-3xl border-2 border-slate-700 hover:border-blue-500 transition text-left group">
+                  <div className="text-4xl mb-4 group-hover:scale-110 transition-transform">🧠</div>
+                  <h4 className="text-xl font-black text-white">Geo Trivia</h4>
+                  <p className="text-slate-400 text-sm font-bold mt-1">Test your raw geography knowledge.</p>
+                </button>
+
+              </div>
+            </div>
           </div>
+        )}
 
-          <section className="mb-8">
-            <GlobeCanvas onSelectMode={(mode: any) => setSelectedMode(mode)} />
-          </section>
-
-          <h2 className="text-sm font-mono font-bold uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-cyan-400" /> Timed Practice Simulations (10 Questions Each)
-          </h2>
-          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-            <button
-              onClick={() => setSelectedMode('capital')}
-              className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl hover:border-amber-400/60 text-left transition duration-300 group hover:shadow-xl"
-            >
-              <div className="w-10 h-10 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 text-xl mb-3">
-                🏛️
-              </div>
-              <h3 className="font-extrabold text-lg text-white group-hover:text-amber-400 transition">Capital Match</h3>
-              <p className="text-slate-400 text-xs mt-1">10 randomized capital questions per run.</p>
-            </button>
-
-            <button
-              onClick={() => setSelectedMode('videoguessr')}
-              className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl hover:border-cyan-400/60 text-left transition duration-300 group hover:shadow-xl"
-            >
-              <div className="w-10 h-10 rounded-2xl bg-cyan-400/10 border border-cyan-400/30 flex items-center justify-center text-cyan-400 text-xl mb-3">
-                🎥
-              </div>
-              <h3 className="font-extrabold text-lg text-white group-hover:text-cyan-400 transition">VideoGuessr</h3>
-              <p className="text-slate-400 text-xs mt-1">10 randomized location video clips per run.</p>
-            </button>
-
-            <button
-              onClick={() => setSelectedMode('trivia')}
-              className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl hover:border-emerald-400/60 text-left transition duration-300 group hover:shadow-xl"
-            >
-              <div className="w-10 h-10 rounded-2xl bg-emerald-400/10 border border-emerald-400/30 flex items-center justify-center text-emerald-400 text-xl mb-3">
-                🧭
-              </div>
-              <h3 className="font-extrabold text-lg text-white group-hover:text-emerald-400 transition">GeoTrivia</h3>
-              <p className="text-slate-400 text-xs mt-1">10 randomized geography trivia questions per run.</p>
-            </button>
-
-            <button
-              onClick={() => setSelectedMode('marathon_practice')}
-              className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl hover:border-purple-400/60 text-left transition duration-300 group hover:shadow-xl"
-            >
-              <div className="w-10 h-10 rounded-2xl bg-purple-400/10 border border-purple-400/30 flex items-center justify-center text-purple-400 text-xl mb-3">
-                ⚡
-              </div>
-              <h3 className="font-extrabold text-lg text-white group-hover:text-purple-400 transition">3-in-1 Marathon</h3>
-              <p className="text-slate-400 text-xs mt-1">Full 30-question randomized practice endurance run.</p>
-            </button>
-          </section>
-        </>
-      )}
-
-      {activeTab === 'activity' && <ActivityFeed userId={user.id} runnerName={callsign} />}
-      {activeTab === 'leaderboard' && <Leaderboard />}
+        {activeTab === 'activity' && <ActivityFeed userId={user.id} runnerName={callsign} />}
+        {activeTab === 'leaderboard' && <Leaderboard />}
+      </div>
 
       {selectedMode && (
-        <GameRunner
-          mode={selectedMode}
-          userId={user.id}
-          runnerName={callsign}
-          onClose={() => setSelectedMode(null)}
-        />
+        <GameRunner mode={selectedMode} userId={user.id} runnerName={callsign} onClose={() => setSelectedMode(null)} />
       )}
     </main>
   );
