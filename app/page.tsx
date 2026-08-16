@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import GameRunner from '@/components/GameRunner';
 import ActivityFeed from '@/components/ActivityFeed';
 import Leaderboard from '@/components/Leaderboard';
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 const GlobeCanvas = dynamic(() => import('@/components/GlobeCanvas'), {
   ssr: false,
@@ -36,6 +36,8 @@ export default function Home() {
 
   // Strict Supabase Google Auth Session Enforcement
   useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
@@ -67,6 +69,11 @@ export default function Home() {
   }, []);
 
   const handleGoogleAuth = async () => {
+    if (!isSupabaseConfigured) {
+      alert('Vercel environment variables are missing! Check the red banner on screen.');
+      return;
+    }
+
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -91,6 +98,18 @@ export default function Home() {
         <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 translate-y-1/2 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none" />
 
         <div className="relative z-10 bg-slate-900/80 backdrop-blur-2xl border border-slate-800/80 rounded-3xl p-8 sm:p-10 max-w-md w-full shadow-[0_0_80px_rgba(0,0,0,0.8)] text-center">
+          
+          {/* Missing Keys Warning Banner */}
+          {!isSupabaseConfigured && (
+            <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/40 rounded-2xl text-left text-xs font-mono text-rose-300 space-y-1">
+              <span className="font-bold text-rose-400 block uppercase">⚠️ Vercel Configuration Error</span>
+              <p>Next.js cannot read your Supabase Environment Variables.</p>
+              <p className="text-[10px] text-rose-400/80 mt-1">
+                Verify <code className="bg-slate-950 px-1 py-0.5 rounded">NEXT_PUBLIC_SUPABASE_URL</code> and <code className="bg-slate-950 px-1 py-0.5 rounded">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> are saved under <strong>Production</strong> in Vercel Settings.
+              </p>
+            </div>
+          )}
+
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-400/10 border border-amber-400/30 rounded-full text-amber-300 text-xs font-mono font-bold uppercase tracking-widest mb-6">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             Authentication Required
