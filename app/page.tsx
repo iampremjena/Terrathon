@@ -20,7 +20,6 @@ const GlobeCanvas = dynamic(() => import('@/components/GlobeCanvas'), {
 export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [callsign, setCallsign] = useState<string>('');
-  const [isSettingCallsign, setIsSettingCallsign] = useState<boolean>(false);
   const [onlineAthletes, setOnlineAthletes] = useState<number>(1428);
   const [activeTab, setActiveTab] = useState<'hub' | 'activity' | 'leaderboard'>('hub');
   const [selectedMode, setSelectedMode] = useState<
@@ -70,7 +69,9 @@ export default function Home() {
   const handleGoogleAuth = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
     });
   };
 
@@ -80,18 +81,11 @@ export default function Home() {
     setCallsign('');
   };
 
-  const handleSaveCallsign = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (callsign.trim()) {
-      setIsSettingCallsign(false);
-    }
-  };
-
   // --- GATEWAY 1: MANDATORY AUTHENTICATION WALL ---
   if (!user) {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6 relative overflow-hidden font-sans">
-        {/* Futuristic Background Grid & Ambient Glows */}
+        {/* Background Grid & Ambient Glows */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-40" />
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-amber-500/10 rounded-full blur-[120px] pointer-events-none" />
         <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 translate-y-1/2 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none" />
