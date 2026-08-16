@@ -70,7 +70,7 @@ export default function Home() {
 
   const handleGoogleAuth = async () => {
     if (!isSupabaseConfigured) {
-      alert('Vercel environment variables are missing! Check the red banner on screen.');
+      alert('Vercel environment variables are missing! Please check Vercel dashboard settings.');
       return;
     }
 
@@ -99,17 +99,6 @@ export default function Home() {
 
         <div className="relative z-10 bg-slate-900/80 backdrop-blur-2xl border border-slate-800/80 rounded-3xl p-8 sm:p-10 max-w-md w-full shadow-[0_0_80px_rgba(0,0,0,0.8)] text-center">
           
-          {/* Missing Keys Warning Banner */}
-          {!isSupabaseConfigured && (
-            <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/40 rounded-2xl text-left text-xs font-mono text-rose-300 space-y-1">
-              <span className="font-bold text-rose-400 block uppercase">⚠️ Vercel Configuration Error</span>
-              <p>Next.js cannot read your Supabase Environment Variables.</p>
-              <p className="text-[10px] text-rose-400/80 mt-1">
-                Verify <code className="bg-slate-950 px-1 py-0.5 rounded">NEXT_PUBLIC_SUPABASE_URL</code> and <code className="bg-slate-950 px-1 py-0.5 rounded">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> are saved under <strong>Production</strong> in Vercel Settings.
-              </p>
-            </div>
-          )}
-
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-400/10 border border-amber-400/30 rounded-full text-amber-300 text-xs font-mono font-bold uppercase tracking-widest mb-6">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             Authentication Required
@@ -122,7 +111,7 @@ export default function Home() {
             Global Competitive Geography Matrix
           </p>
 
-          <div className="p-4 bg-slate-950/60 border border-slate-800/80 rounded-2xl mb-8 text-left space-y-2">
+          <div className="p-4 bg-slate-950/60 border border-slate-800/80 rounded-2xl mb-6 text-left space-y-2">
             <div className="flex justify-between items-center text-xs font-mono text-slate-400">
               <span>ACTIVE SYSTEM RADAR:</span>
               <span className="text-emerald-400 font-bold">ONLINE</span>
@@ -135,7 +124,7 @@ export default function Home() {
 
           <button
             onClick={handleGoogleAuth}
-            className="w-full flex items-center justify-center gap-3 py-4 bg-white hover:bg-slate-100 text-slate-950 font-extrabold rounded-2xl transition shadow-[0_0_30px_rgba(255,255,255,0.15)] hover:scale-[1.02] active:scale-95"
+            className="w-full flex items-center justify-center gap-3 py-4 bg-white hover:bg-slate-100 text-slate-950 font-extrabold rounded-2xl transition shadow-[0_0_30px_rgba(255,255,255,0.15)] hover:scale-[1.02] active:scale-95 mb-6"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -145,6 +134,14 @@ export default function Home() {
             </svg>
             Authenticate with Google
           </button>
+
+          {/* VERCEL ENVIRONMENT DIAGNOSTIC BAR */}
+          <div className="pt-4 border-t border-slate-800/80 flex justify-between items-center text-[10px] font-mono">
+            <span className="text-slate-500">CONFIG STATUS:</span>
+            <span className={isSupabaseConfigured ? "text-emerald-400 font-bold" : "text-rose-400 font-bold animate-pulse"}>
+              {isSupabaseConfigured ? "✓ KEYS LOADED" : "✕ MISSING VERCEL ENV KEYS"}
+            </span>
+          </div>
         </div>
       </main>
     );
