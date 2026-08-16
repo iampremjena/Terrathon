@@ -1,120 +1,105 @@
 'use client';
 
-import React from 'react';
-import { useActivityFeed } from '@/hooks/useActivityFeed';
+import React, { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
-interface ActivityFeedProps {
-  userId: string | null;
-  runnerName: string;
+interface ActivityItem {
+  id: string;
+  runner_name: string;
+  mode: string;
+  score: number;
+  accuracy_percentage: number;
+  created_at: string;
 }
 
-export default function ActivityFeed({ userId, runnerName }: ActivityFeedProps) {
-  const { activities, loading } = useActivityFeed(userId || undefined);
+export default function ActivityFeed({ userId, runnerName }: { userId: string | null; runnerName: string }) {
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const formatTime = (ms: number) => {
-    const totalSecs = Math.floor(ms / 1000);
-    const mins = Math.floor(totalSecs / 60);
-    const secs = totalSecs % 60;
-    return `${mins > 0 ? `${mins}m ` : ''}${secs}s`;
-  };
+  useEffect(() => {
+    async function fetchActivities() {
+      try {
+        const { data, error } = await supabase
+          .from('run_activities')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(20);
 
-  if (!userId) {
-    return (
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
-        <div className="text-4xl mb-3">🏃‍♂️</div>
-        <h3 className="text-lg font-bold text-white mb-2">Guest Runner Profile</h3>
-        <p className="text-slate-400 text-sm max-w-md mx-auto">
-          Sign in with Google to persist your run history, track geographical pin accuracy, and analyze split times across all practice and official runs.
-        </p>
-      </div>
-    );
-  }
+        if (!error && data) {
+          setActivities(data as ActivityItem[]);
+        }
+      } catch (err) {
+        console.error('Failed to load Strava activity feed:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchActivities();
+  }, [userId]);
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        {[1, 2].map((i) => (
-          <div key={i} className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 animate-pulse">
-            <div className="h-4 bg-slate-800 rounded w-1/3 mb-3"></div>
-            <div className="h-12 bg-slate-800/60 rounded"></div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (activities.length === 0) {
-    return (
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
-        <div className="text-4xl mb-3">📍</div>
-        <h3 className="text-lg font-bold text-white mb-1">No Activity Logs Found</h3>
-        <p className="text-slate-400 text-sm">Launch a practice run or official Terrathon challenge to log your first activity!</p>
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 text-slate-400 font-mono text-xs animate-pulse text-center">
+        FETCHING STRAVA TELEMETRY FEED...
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <span>📊</span> Activity History — <span className="text-amber-400">{runnerName}</span>
-        </h2>
-        <span className="text-xs font-mono text-slate-400">{activities.length} Total Runs</span>
+    <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl">
+      <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
+        <div>
+          <h2 className="text-xl font-black text-white tracking-tight">Strava Activity Feed</h2>
+          <p className="text-xs text-slate-400 font-mono">Live telemetry stream for {runnerName || 'Athletes'}</p>
+        </div>
+        <span className="px-3 py-1 bg-amber-400/10 border border-amber-400/30 text-amber-300 font-mono text-[10px] font-bold uppercase rounded-md">
+          ● Live Feed
+        </span>
       </div>
 
-      {activities.map((act) => {
-        const isOfficial = act.mode === 'terrathon_official';
-        return (
-          <div
-            key={act.id}
-            className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-6 transition shadow-lg"
-          >
-            {/* Run Card Header */}
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-lg font-extrabold text-white capitalize">
-                    {act.mode.replace('_', ' ')} Run
-                  </span>
-                  {isOfficial && (
-                    <span className="px-2 py-0.5 bg-amber-400 text-slate-950 font-mono font-bold text-[10px] rounded uppercase">
-                      Official
-                    </span>
-                  )}
+      {activities.length === 0 ? (
+        <div className="text-center py-12 text-slate-500 font-mono text-xs">
+          No activities recorded yet. Complete an official run or practice simulation to generate telemetry.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {activities.map((item) => (
+            <div
+              key={item.id}
+              className="p-5 bg-slate-950 border border-slate-800 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-slate-700 transition"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 text-lg font-bold font-mono">
+                  ⚡
                 </div>
-                <p className="text-xs text-slate-400">
-                  {new Date(act.created_at).toLocaleDateString(undefined, {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}
-                </p>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-extrabold text-white text-sm">{item.runner_name || 'Athlete'}</h4>
+                    <span className="px-2 py-0.5 bg-slate-800 text-cyan-400 font-mono text-[10px] rounded uppercase font-bold">
+                      {item.mode}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    {new Date(item.created_at).toLocaleDateString()} at {new Date(item.created_at).toLocaleTimeString()}
+                  </span>
+                </div>
               </div>
 
-              <div className="text-right">
-                <span className="font-mono text-xl font-extrabold text-amber-400">+{act.score} XP</span>
+              <div className="flex items-center gap-6 font-mono text-right w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-900">
+                <div>
+                  <span className="text-slate-500 text-[10px] block">ACCURACY</span>
+                  <span className="text-cyan-400 font-bold text-sm">{item.accuracy_percentage}%</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-[10px] block">XP GAINED</span>
+                  <span className="text-amber-400 font-black text-base">+{item.score} XP</span>
+                </div>
               </div>
             </div>
-
-            {/* Metrics Breakdown Grid */}
-            <div className="grid grid-cols-3 gap-3 bg-slate-950/80 p-4 rounded-xl border border-slate-800 text-center">
-              <div>
-                <span className="block text-[10px] uppercase font-mono text-slate-500">Duration</span>
-                <span className="font-mono text-sm font-bold text-white">{formatTime(act.total_time_ms)}</span>
-              </div>
-              <div>
-                <span className="block text-[10px] uppercase font-mono text-slate-500">Accuracy</span>
-                <span className="font-mono text-sm font-bold text-emerald-400">{act.accuracy_percentage}%</span>
-              </div>
-              <div>
-                <span className="block text-[10px] uppercase font-mono text-slate-500">Avg Pin Error</span>
-                <span className="font-mono text-sm font-bold text-sky-400">{act.avg_pin_error_km || 0} km</span>
-              </div>
-            </div>
-          </div>
-        );
-      })}
+          ))}
+        </div>
+      )}
     </div>
   );
 }
