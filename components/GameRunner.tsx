@@ -230,10 +230,10 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
                 </div>
               )}
 
-              {/* Text Multiple Choice Mode */}
-              {stage !== 'photos' && currentQ && (
+              {/* FIX: Explicitly check if 'options' exists in currentQ before mapping */}
+              {stage !== 'photos' && currentQ && 'options' in currentQ && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {currentQ.options.map((opt) => {
+                  {currentQ.options.map((opt: string) => {
                     let btnClass = "bg-slate-100 hover:bg-slate-200 text-slate-800 border-2 border-slate-200";
                     if (isAnswered) {
                       const isCorrect = stage === 'capitals' ? opt === (currentQ as CapitalQuestion).capital : opt === (currentQ as TriviaQuestion).correctAnswer;

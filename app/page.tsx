@@ -127,7 +127,10 @@ export default function Home() {
             
             {/* Hero Main Game Card */}
             <div className="bg-gradient-to-br from-blue-900 to-slate-800 p-8 rounded-3xl border-4 border-blue-500 flex flex-col md:flex-row items-center justify-between shadow-2xl relative overflow-hidden">
-              <div className="absolute inset-0 opacity-20 pointer-events-none"><GlobeCanvas /></div>
+              <div className="absolute inset-0 opacity-20 pointer-events-none">
+                {/* FIX: Passed dummy function to onSelectMode to satisfy TypeScript */}
+                <GlobeCanvas onSelectMode={() => {}} />
+              </div>
               <div className="relative z-10 mb-6 md:mb-0 text-center md:text-left">
                 <span className="bg-blue-500 text-white font-black px-3 py-1 rounded-lg text-xs tracking-widest uppercase mb-3 inline-block">Official Run</span>
                 <h2 className="text-4xl font-black mb-2">The Terrathon</h2>
