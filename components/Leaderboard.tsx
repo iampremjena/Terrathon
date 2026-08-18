@@ -3,102 +3,63 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export interface LeaderboardUser {
+interface Profile {
   id: string;
   username: string;
-  avatar_url?: string;
   total_xp: number;
   total_runs: number;
 }
 
 export default function Leaderboard() {
-  const [leaders, setLeaders] = useState<LeaderboardUser[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [leaders, setLeaders] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchLeaderboard() {
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url, total_xp, total_runs')
-          .order('total_xp', { ascending: false })
-          .limit(10);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, total_xp, total_runs')
+        .order('total_xp', { ascending: false })
+        .limit(10); // TOP 10 WORLDWIDE
 
-        if (!error && data) {
-          setLeaders(data as LeaderboardUser[]);
-        }
-      } catch (err) {
-        console.error('Failed to load leaderboard:', err);
-      } finally {
-        setLoading(false);
+      if (!error && data) {
+        setLeaders(data);
       }
+      setLoading(false);
     }
-
     fetchLeaderboard();
   }, []);
 
   if (loading) {
-    return (
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-slate-400 font-mono text-sm animate-pulse text-center">
-        Fetching global standings...
-      </div>
-    );
+    return <div className="text-center p-10 text-slate-400 font-bold animate-pulse">Loading Global Rankings...</div>;
   }
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-xl font-extrabold text-white">Global Terrathon Leaderboard</h2>
-          <p className="text-xs text-slate-400">Ranked by total accumulated run XP</p>
-        </div>
-        <span className="px-3 py-1 bg-amber-400/10 border border-amber-400/30 text-amber-300 text-xs font-mono font-bold rounded-full">
-          Season 1 Active
-        </span>
-      </div>
-
-      {leaders.length === 0 ? (
-        <p className="text-slate-400 text-sm text-center py-6">
-          No ranked runners yet. Complete official runs to claim rank #1!
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {leaders.map((runner, index) => {
-            const isTop3 = index < 3;
-            const badgeColor =
-              index === 0
-                ? 'bg-amber-400 text-slate-950'
-                : index === 1
-                ? 'bg-slate-300 text-slate-950'
-                : index === 2
-                ? 'bg-amber-700 text-white'
-                : 'bg-slate-800 text-slate-400';
-
-            return (
-              <div
-                key={runner.id}
-                className={`flex items-center justify-between p-4 rounded-xl border transition ${
-                  isTop3 ? 'bg-slate-950/80 border-slate-700' : 'bg-slate-950/40 border-slate-800/60'
-                }`}
-              >
-                <div className="flex items-center gap-4">
-                  <span className={`w-7 h-7 flex items-center justify-center font-mono font-bold text-xs rounded-lg ${badgeColor}`}>
-                    #{index + 1}
-                  </span>
-                  <div>
-                    <h4 className="font-bold text-white text-sm">{runner.username}</h4>
-                    <span className="text-xs text-slate-500 font-mono">{runner.total_runs} Completed Runs</span>
-                  </div>
-                </div>
-
-                <div className="text-right font-mono">
-                  <span className="text-amber-400 font-extrabold text-base">{runner.total_xp} XP</span>
-                </div>
+    <div className="bg-slate-800 p-8 rounded-3xl shadow-xl border-2 border-slate-700">
+      <h2 className="text-2xl font-black text-white mb-2">Top 10 Global Leaderboard</h2>
+      <p className="text-sm font-bold text-slate-400 mb-6 uppercase tracking-widest">Ranked by Total Lifetime XP</p>
+      
+      <div className="space-y-3">
+        {leaders.map((leader, index) => (
+          <div key={leader.id} className={`flex justify-between items-center p-5 rounded-2xl ${index === 0 ? 'bg-amber-500 text-slate-900 shadow-lg scale-[1.02]' : index === 1 ? 'bg-slate-300 text-slate-900' : index === 2 ? 'bg-amber-700 text-white' : 'bg-slate-900 text-white border border-slate-700'}`}>
+            <div className="flex items-center gap-4">
+              <span className="font-black text-xl w-6">{index + 1}</span>
+              <div>
+                <h3 className="font-black text-lg">{leader.username}</h3>
+                <p className={`text-xs font-bold ${index < 3 ? 'opacity-80' : 'text-slate-400'}`}>{leader.total_runs} Runs Completed</p>
               </div>
-            );
-          })}
-        </div>
-      )}
+            </div>
+            <div className="text-right">
+              <span className="font-black text-2xl">{leader.total_xp.toLocaleString()}</span>
+              <span className={`text-xs block font-bold uppercase tracking-wider ${index < 3 ? 'opacity-80' : 'text-blue-400'}`}>XP</span>
+            </div>
+          </div>
+        ))}
+
+        {leaders.length === 0 && (
+          <div className="text-center py-10 text-slate-500 font-bold">No athletes ranked yet. Be the first!</div>
+        )}
+      </div>
     </div>
   );
 }
