@@ -33,7 +33,7 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
   const [mapResult, setMapResult] = useState<{ distance: number; pts: number } | null>(null);
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   
-  // Contingency Plan State for Corrupted Images
+  // Contingency Plan State
   const [imgFailover, setImgFailover] = useState<number>(0);
 
   const initRef = useRef(false);
@@ -49,10 +49,7 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
     }
   }, [mode]);
 
-  // Reset image failover state when question changes
-  useEffect(() => {
-    setImgFailover(0);
-  }, [currentIndex, stage]);
+  useEffect(() => { setImgFailover(0); }, [currentIndex, stage]);
 
   useEffect(() => {
     if (stage === 'complete' || isAnswered) return;
@@ -157,12 +154,12 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
               {stage === 'photos' && currentQ && (
                 <div className="absolute inset-0 w-full h-full bg-slate-950 flex flex-col items-center justify-center p-4 pb-48 sm:pb-4">
                   
-                  {/* 3-Tier Image Loading System with Object-Contain for Zero Cropping */}
+                  {/* PROXY IMAGE FETCHING */}
                   <img 
                     src={
-                      imgFailover === 0 ? (currentQ as PhotoQuestion).imageUrl 
-                      : imgFailover === 1 ? (currentQ as PhotoQuestion).fallbackUrl 
-                      : `https://placehold.co/1200x800/0f172a/e2e8f0?text=${encodeURIComponent('IMAGE BLOCKED BY NETWORK\n\nClue:\n' + (currentQ as PhotoQuestion).clue)}`
+                      imgFailover === 0 ? `/api/image-proxy?url=${encodeURIComponent((currentQ as PhotoQuestion).imageUrl)}`
+                      : imgFailover === 1 ? `/api/image-proxy?url=${encodeURIComponent((currentQ as PhotoQuestion).fallbackUrl)}`
+                      : `https://placehold.co/1200x800/0f172a/e2e8f0?text=${encodeURIComponent('ALL SERVERS BLOCKED\n\nClue:\n' + (currentQ as PhotoQuestion).clue)}`
                     }
                     onError={() => {
                       if (imgFailover < 2) setImgFailover(prev => prev + 1);
@@ -171,7 +168,7 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
                     className="w-full h-full object-contain rounded-xl shadow-2xl" 
                   />
                   
-                  {/* Thumbnail Map (Bottom Right / Bottom Center on Mobile) */}
+                  {/* Thumbnail Map */}
                   {!isMapExpanded && !isAnswered && (
                     <div 
                       className="absolute bottom-6 sm:right-6 w-[90%] sm:w-80 h-40 sm:h-56 border-4 border-white shadow-[0_10px_40px_rgba(0,0,0,0.8)] rounded-2xl overflow-hidden cursor-pointer hover:scale-105 transition-transform z-20 group"
