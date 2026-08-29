@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { fetchAllRunQuestions, CapitalQuestion, PhotoQuestion, TriviaQuestion } from '@/lib/questions';
 import { supabase } from '@/lib/supabase';
 
+// Dynamically import the map to avoid SSR issues
 const MapPinDrop = dynamic(() => import('./MapPinDrop'), { ssr: false });
 
 function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -16,7 +17,12 @@ function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   return Math.round(R * c);
 }
 
-interface GameRunnerProps { mode: 'capital' | 'photoguessr' | 'trivia' | 'terrathon_official'; userId: string | null; runnerName: string; onClose: () => void; }
+interface GameRunnerProps { 
+  mode: 'capital' | 'photoguessr' | 'trivia' | 'terrathon_official'; 
+  userId: string | null; 
+  runnerName: string; 
+  onClose: () => void; 
+}
 
 export default function GameRunner({ mode, userId, runnerName, onClose }: GameRunnerProps) {
   const [stage, setStage] = useState<'capitals' | 'photos' | 'trivias' | 'complete'>('capitals');
@@ -39,20 +45,25 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
   useEffect(() => {
     async function loadQuestions() {
       setIsLoading(true);
-      const data = await fetchAllRunQuestions(mode);
+      try {
+        const data = await fetchAllRunQuestions(mode);
 
-      setQuestions({
-        capitals: data.capitals || [],
-        photos: data.photos || [],
-        trivias: data.trivias || []
-      });
+        // Verify that arrays actually exist before setting state
+        setQuestions({
+          capitals: Array.isArray(data?.capitals) ? data.capitals : [],
+          photos: Array.isArray(data?.photos) ? data.photos : [],
+          trivias: Array.isArray(data?.trivias) ? data.trivias : []
+        });
 
-      if (mode === 'capital') setStage('capitals');
-      else if (mode === 'photoguessr') setStage('photos');
-      else if (mode === 'trivia') setStage('trivias');
-      else setStage('capitals');
-
-      setIsLoading(false);
+        if (mode === 'capital') setStage('capitals');
+        else if (mode === 'photoguessr') setStage('photos');
+        else if (mode === 'trivia') setStage('trivias');
+        else setStage('capitals');
+      } catch (err) {
+        console.error("Failed to load run questions:", err);
+      } finally {
+        setIsLoading(false);
+      }
     }
 
     if (!initRef.current) {
@@ -72,7 +83,9 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
     return () => clearInterval(timer);
   }, [timeLeft, isAnswered, stage, isLoading]);
 
-  const currentQ = stage === 'capitals' ? questions.capitals[currentIndex] : stage === 'photos' ? questions.photos[currentIndex] : questions.trivias[currentIndex];
+  // Safely get the active question based on the current stage
+  const activeQuestions = stage === 'capitals' ? questions.capitals : stage === 'photos' ? questions.photos : stage === 'trivias' ? questions.trivias : [];
+  const currentQ = activeQuestions[currentIndex];
 
   const handleAnswer = (option: string) => {
     if (isAnswered) return;
@@ -83,7 +96,10 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
     if (stage === 'capitals') isCorrect = option === (currentQ as CapitalQuestion).capital;
     if (stage === 'trivias') isCorrect = option === (currentQ as TriviaQuestion).correctAnswer;
 
-    if (isCorrect) { setScore((prev) => prev + 100 + (timeLeft * 5)); setCorrectAnswers((prev) => prev + 1); }
+    if (isCorrect) { 
+      setScore((prev) => prev + 100 + (timeLeft * 5)); 
+      setCorrectAnswers((prev) => prev + 1); 
+    }
     setTotalQuestions((prev) => prev + 1);
     setTimeout(advanceNextQuestion, 1500);
   };
@@ -114,9 +130,8 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
 
   const advanceNextQuestion = () => {
     setIsAnswered(false); setSelectedOption(null); setPinDrop(null); setMapResult(null); setIsMapExpanded(false); setTimeLeft(20);
-    const activeList = stage === 'capitals' ? questions.capitals : stage === 'photos' ? questions.photos : questions.trivias;
 
-    if (currentIndex + 1 < activeList.length) {
+    if (currentIndex + 1 < activeQuestions.length) {
       setCurrentIndex((prev) => prev + 1);
     } else {
       setCurrentIndex(0);
@@ -124,14 +139,23 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
         if (stage === 'capitals' && questions.photos.length > 0) setStage('photos');
         else if (stage === 'photos' && questions.trivias.length > 0) setStage('trivias');
         else finishRun();
-      } else { finishRun(); }
+      } else { 
+        finishRun(); 
+      }
     }
   };
 
   const finishRun = async () => {
     setStage('complete');
     if (userId) {
-      await supabase.from('run_activities').insert({ user_id: userId, runner_name: runnerName || 'Runner', mode: mode.toUpperCase(), score, accuracy_percentage: Math.round((correctAnswers / (totalQuestions || 1)) * 100), created_at: new Date().toISOString() });
+      await supabase.from('run_activities').insert({ 
+        user_id: userId, 
+        runner_name: runnerName || 'Runner', 
+        mode: mode.toUpperCase(), 
+        score, 
+        accuracy_percentage: Math.round((correctAnswers / (totalQuestions || 1)) * 100), 
+        created_at: new Date().toISOString() 
+      });
     }
   };
 
@@ -142,7 +166,11 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
         {/* Game Header */}
         <div className="bg-slate-100 p-4 border-b-2 border-slate-200 flex justify-between items-center text-slate-800 z-10 relative shadow-md">
           <div><div className="text-xs font-black text-slate-400 uppercase tracking-widest">{stage} Stage</div><div className="text-2xl font-black">{timeLeft}s</div></div>
-          <div className="text-center hidden sm:block"><div className="text-xs font-black text-slate-400 uppercase tracking-widest">Question {currentIndex + 1} / {stage !== 'complete' ? questions[stage]?.length : 10}</div></div><div className="text-right flex items-center gap-4">
+          
+          {/* TypeScript Fix applied here */}
+          <div className="text-center hidden sm:block"><div className="text-xs font-black text-slate-400 uppercase tracking-widest">Question {currentIndex + 1} / {stage !== 'complete' ? questions[stage]?.length : 10}</div></div>
+          
+          <div className="text-right flex items-center gap-4">
             <div><div className="text-xs font-black text-slate-400 uppercase tracking-widest">Score</div><div className="text-2xl font-black text-blue-600">{score}</div></div>
             <button onClick={onClose} className="bg-slate-800 text-white px-4 py-3 rounded-xl text-xs font-bold hover:bg-rose-600 transition">QUIT</button>
           </div>
@@ -156,6 +184,20 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
               <h3 className="text-2xl font-black tracking-wide">GENERATING RUN...</h3>
               <p className="text-slate-400 text-sm mt-2">Connecting to backend server engine</p>
             </div>
+          ) : stage !== 'complete' && (!activeQuestions || activeQuestions.length === 0) ? (
+            
+            /* SAFETY RENDER CHECK: Shows if API failed to return data */
+            <div className="text-center z-10 bg-slate-900 border border-slate-700 p-10 rounded-3xl shadow-2xl max-w-md w-full mx-4">
+              <h3 className="text-3xl font-black mb-3 text-rose-500">Run Failed</h3>
+              <p className="text-slate-400 text-sm mb-8 font-semibold">The global API databases dropped the connection. Please try starting the run again.</p>
+              <button 
+                onClick={onClose}
+                className="w-full py-4 bg-blue-600 hover:bg-blue-500 font-black text-white text-lg rounded-xl transition"
+              >
+                RETURN TO LOBBY
+              </button>
+            </div>
+
           ) : stage === 'complete' ? (
             <div className="text-center z-10 bg-white p-12 rounded-3xl shadow-2xl m-4">
               <h2 className="text-5xl font-black mb-4 text-slate-900">RUN COMPLETE</h2>
@@ -240,9 +282,22 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
                       let btnClass = "bg-slate-100 hover:bg-slate-200 text-slate-800 border-2 border-slate-200";
                       if (isAnswered) {
                         const isCorrect = stage === 'capitals' ? opt === (currentQ as CapitalQuestion).capital : opt === (currentQ as TriviaQuestion).correctAnswer;
-                        if (isCorrect) btnClass = "bg-green-500 text-white border-green-600 scale-105 shadow-xl"; else if (opt === selectedOption) btnClass = "bg-red-500 text-white border-red-600"; else btnClass = "bg-slate-100 opacity-40";
-                      } else if (opt === selectedOption) btnClass = "bg-blue-500 text-white border-blue-600 shadow-md";
-                      return ( <button key={opt} onClick={() => handleAnswer(opt)} disabled={isAnswered} className={`p-6 sm:p-8 rounded-2xl font-black text-lg sm:text-xl transition-all duration-200 ${btnClass}`}>{opt}</button> );
+                        if (isCorrect) btnClass = "bg-green-500 text-white border-green-600 scale-105 shadow-xl"; 
+                        else if (opt === selectedOption) btnClass = "bg-red-500 text-white border-red-600"; 
+                        else btnClass = "bg-slate-100 opacity-40";
+                      } else if (opt === selectedOption) {
+                        btnClass = "bg-blue-500 text-white border-blue-600 shadow-md";
+                      }
+                      return ( 
+                        <button 
+                          key={opt} 
+                          onClick={() => handleAnswer(opt)} 
+                          disabled={isAnswered} 
+                          className={`p-6 sm:p-8 rounded-2xl font-black text-lg sm:text-xl transition-all duration-200 ${btnClass}`}
+                        >
+                          {opt}
+                        </button> 
+                      );
                     })}
                   </div>
                 </div>

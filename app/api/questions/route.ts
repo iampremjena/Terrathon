@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 
-// Force Vercel to NEVER cache this route - always run fresh
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
@@ -23,95 +22,94 @@ function decodeHTMLEntities(text: string): string {
 }
 
 export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const mode = searchParams.get('mode') || 'terrathon_official';
+  const { searchParams } = new URL(request.url);
+  const mode = searchParams.get('mode') || 'terrathon_official';
 
-    let capitals: any[] = [];
-    let photos: any[] = [];
-    let trivias: any[] = [];
+  let capitals: any[] = [];
+  let photos: any[] = [];
+  let trivias: any[] = [];
 
-    // STANDARD HEADERS TO PREVENT VERCEL BLOCKS
-    const headers = { 
-      'User-Agent': 'TerrathonApp/1.0 (Contact: admin@terrathon.com)',
-      'Accept': 'application/json'
-    };
+  const headers = { 
+    'User-Agent': 'TerrathonApp/1.0 (Contact: admin@terrathon.com)',
+    'Accept': 'application/json'
+  };
 
-    // ============================================================================
-    // 1. FETCH DYNAMIC COUNTRIES (Used for Capitals & Photo Coordinates)
-    // ============================================================================
-    const countriesRes = await fetch('https://restcountries.com/v3.1/all?fields=name,capital,region,latlng', { headers });
-    const countriesData = await countriesRes.json();
-    
-    // EXPLICITLY TYPE AS any[] TO PREVENT TYPESCRIPT ERRORS
-    const validCountries: any[] = countriesData.filter((c: any) => c.capital && c.capital.length > 0 && c.latlng && c.latlng.length === 2);
-    const allCapitalsList = validCountries.map((c: any) => c.capital[0]);
+  // 1. DYNAMIC CAPITALS
+  if (mode === 'capital' || mode === 'terrathon_official') {
+    try {
+      const res = await fetch('https://restcountries.com/v3.1/all?fields=name,capital,region,latlng', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        const validCountries: any[] = data.filter((c: any) => c.capital && c.capital.length > 0 && c.latlng && c.latlng.length === 2);
+        const allCapitalsList = validCountries.map((c: any) => c.capital[0]);
+        const selectedCaps = shuffle(validCountries).slice(0, 10);
 
-    if (mode === 'capital' || mode === 'terrathon_official') {
-      const selectedCaps = shuffle(validCountries).slice(0, 10);
-      capitals = selectedCaps.map((c: any, idx: number) => {
-        const distractors = shuffle(allCapitalsList.filter((cap: string) => cap !== c.capital[0])).slice(0, 3);
-        return {
-          id: `cap_${idx}`,
-          country: c.name.common,
-          capital: c.capital[0],
-          continent: c.region,
-          coordinates: { lat: c.latlng[0], lng: c.latlng[1] },
-          options: shuffle([c.capital[0], ...distractors]),
-        };
-      });
+        capitals = selectedCaps.map((c: any, idx: number) => {
+          const distractors = shuffle(allCapitalsList.filter((cap: string) => cap !== c.capital[0])).slice(0, 3);
+          return {
+            id: `cap_${idx}`,
+            country: c.name.common,
+            capital: c.capital[0],
+            continent: c.region,
+            coordinates: { lat: c.latlng[0], lng: c.latlng[1] },
+            options: shuffle([c.capital[0], ...distractors]),
+          };
+        });
+      }
+    } catch (e) {
+      console.error("Capitals dynamic fetch error:", e);
     }
+  }
 
-    // ============================================================================
-    // 2. FETCH DYNAMIC PHOTOS (Wikipedia Image Scraping via Live Coordinates)
-    // ============================================================================
-    if (mode === 'photoguessr' || mode === 'terrathon_official') {
-      // EXPLICITLY TYPE AS any[] TO FIX TS18046
-      const shuffledForPhotos: any[] = shuffle(validCountries);
-      
-      // Keep fetching Wikipedia images until we have exactly 10 valid photos
-      for (const country of shuffledForPhotos) {
-        if (photos.length >= 10) break;
-        
-        try {
-          const capitalName = country.capital[0];
-          const wikiRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(capitalName)}&prop=pageimages&format=json&pithumbsize=1000`, { headers });
-          const wikiData = await wikiRes.json();
-          
-          const pages = wikiData.query?.pages;
-          if (!pages) continue;
-          
-          const pageId = Object.keys(pages)[0];
-          const imgUrl = pages[pageId]?.thumbnail?.source;
+  // 2. DYNAMIC PHOTOS
+  if (mode === 'photoguessr' || mode === 'terrathon_official') {
+    try {
+      const res = await fetch('https://restcountries.com/v3.1/all?fields=name,capital,region,latlng', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        const validCountries: any[] = data.filter((c: any) => c.capital && c.capital.length > 0 && c.latlng && c.latlng.length === 2);
+        const shuffledForPhotos: any[] = shuffle(validCountries);
 
-          // Ensure it has an image, and filter out boring maps/flags
-          if (imgUrl && !imgUrl.toLowerCase().includes('map') && !imgUrl.toLowerCase().includes('flag')) {
-            photos.push({
-              id: `photo_${photos.length}`,
-              locationName: capitalName,
-              country: country.name.common,
-              imageUrl: imgUrl,
-              fallbackUrl: imgUrl,
-              coordinates: { lat: country.latlng[0], lng: country.latlng[1] },
-              clue: `Capital city located in ${country.region}`
-            });
+        for (const country of shuffledForPhotos) {
+          if (photos.length >= 10) break;
+          try {
+            const capitalName = country.capital[0];
+            const wikiRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(capitalName)}&prop=pageimages&format=json&pithumbsize=1000`, { headers });
+            if (wikiRes.ok) {
+              const wikiData = await wikiRes.json();
+              const pages = wikiData.query?.pages;
+              if (pages) {
+                const pageId = Object.keys(pages)[0];
+                const imgUrl = pages[pageId]?.thumbnail?.source;
+                if (imgUrl && !imgUrl.toLowerCase().includes('map') && !imgUrl.toLowerCase().includes('flag')) {
+                  photos.push({
+                    id: `photo_${photos.length}`,
+                    locationName: capitalName,
+                    country: country.name.common,
+                    imageUrl: imgUrl,
+                    fallbackUrl: imgUrl,
+                    coordinates: { lat: country.latlng[0], lng: country.latlng[1] },
+                    clue: `Capital city located in ${country.region}`
+                  });
+                }
+              }
+            }
+          } catch (e) {
+            continue;
           }
-        } catch (e) {
-          // If a single Wikipedia fetch fails, silently continue to the next random country
-          continue;
         }
       }
+    } catch (e) {
+      console.error("Photos dynamic fetch error:", e);
     }
+  }
 
-    // ============================================================================
-    // 3. FETCH DYNAMIC TRIVIA (With Dual-API Failover)
-    // ============================================================================
-    if (mode === 'trivia' || mode === 'terrathon_official') {
-      try {
-        // Primary API: Open Trivia DB
-        const tdbRes = await fetch('https://opentdb.com/api.php?amount=10&category=22&type=multiple', { headers });
+  // 3. DYNAMIC TRIVIA
+  if (mode === 'trivia' || mode === 'terrathon_official') {
+    try {
+      const tdbRes = await fetch('https://opentdb.com/api.php?amount=10&category=22&type=multiple', { headers });
+      if (tdbRes.ok) {
         const tdbData = await tdbRes.json();
-        
         if (tdbData.results && tdbData.results.length > 0) {
           trivias = tdbData.results.map((q: any, idx: number) => {
             const decQ = decodeHTMLEntities(q.question);
@@ -125,29 +123,27 @@ export async function GET(request: Request) {
               category: 'Geography',
             };
           });
-        } else {
-          throw new Error("OpenTDB Rate Limited");
         }
-      } catch (err) {
-        // Backup API: The Trivia API (If OpenTDB blocks Vercel's IP)
+      }
+    } catch (err) {
+      try {
         const backupRes = await fetch('https://the-trivia-api.com/v2/questions?categories=geography&limit=10', { headers });
-        const backupData = await backupRes.json();
-        
-        trivias = backupData.map((q: any, idx: number) => {
-          return {
+        if (backupRes.ok) {
+          const backupData = await backupRes.json();
+          trivias = backupData.map((q: any, idx: number) => ({
             id: `triv_bkp_${idx}`,
             question: q.question.text,
             options: shuffle([q.correctAnswer, ...q.incorrectAnswers]),
             correctAnswer: q.correctAnswer,
             category: 'Geography',
-          };
-        });
+          }));
+        }
+      } catch (e) {
+        console.error("Trivia backup fetch error:", e);
       }
     }
-
-    return NextResponse.json({ capitals, photos, trivias });
-  } catch (err) {
-    console.error("Fatal API Route Error:", err);
-    return NextResponse.json({ error: "Failed to generate dynamic run" }, { status: 500 });
   }
+
+  // ALWAYS return 200 OK with whatever arrays were successfully built
+  return NextResponse.json({ capitals, photos, trivias });
 }
