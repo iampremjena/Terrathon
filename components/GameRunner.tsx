@@ -2,7 +2,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { getRandomizedRunQuestions, CapitalQuestion, PhotoQuestion, TriviaQuestion } from '@/lib/questions';
+import { 
+  fetchDynamicCapitals, 
+  fetchDynamicPhotoQuestions, 
+  fetchDynamicTriviaQuestions, 
+  CapitalQuestion, 
+  PhotoQuestion, 
+  TriviaQuestion 
+} from '@/lib/questions';
 import { supabase } from '@/lib/supabase';
 
 const MapPinDrop = dynamic(() => import('./MapPinDrop'), { ssr: false });
@@ -21,6 +28,7 @@ interface GameRunnerProps { mode: 'capital' | 'photoguessr' | 'trivia' | 'terrat
 export default function GameRunner({ mode, userId, runnerName, onClose }: GameRunnerProps) {
   const [stage, setStage] = useState<'capitals' | 'photos' | 'trivias' | 'complete'>('capitals');
   const [questions, setQuestions] = useState<{ capitals: CapitalQuestion[]; photos: PhotoQuestion[]; trivias: TriviaQuestion[]; }>({ capitals: [], photos: [], trivias: [] });
+  const [isLoading, setIsLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [correctAnswers, setCorrectAnswers] = useState(0);
@@ -32,27 +40,38 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
   const [pinDrop, setPinDrop] = useState<{ lat: number; lng: number } | null>(null);
   const [mapResult, setMapResult] = useState<{ distance: number; pts: number } | null>(null);
   const [isMapExpanded, setIsMapExpanded] = useState(false);
-  
-  // Contingency Plan State
-  const [imgFailover, setImgFailover] = useState<number>(0);
 
   const initRef = useRef(false);
 
   useEffect(() => {
-    if (!initRef.current) {
-      setQuestions(getRandomizedRunQuestions(mode));
+    async function loadQuestions() {
+      setIsLoading(true);
+      let caps: CapitalQuestion[] = [];
+      let photos: PhotoQuestion[] = [];
+      let trivs: TriviaQuestion[] = [];
+
+      if (mode === 'capital' || mode === 'terrathon_official') caps = await fetchDynamicCapitals();
+      if (mode === 'photoguessr' || mode === 'terrathon_official') photos = await fetchDynamicPhotoQuestions();
+      if (mode === 'trivia' || mode === 'terrathon_official') trivs = await fetchDynamicTriviaQuestions();
+
+      setQuestions({ capitals: caps, photos, trivias: trivs });
+
       if (mode === 'capital') setStage('capitals');
       else if (mode === 'photoguessr') setStage('photos');
       else if (mode === 'trivia') setStage('trivias');
       else setStage('capitals');
+
+      setIsLoading(false);
+    }
+
+    if (!initRef.current) {
+      loadQuestions();
       initRef.current = true;
     }
   }, [mode]);
 
-  useEffect(() => { setImgFailover(0); }, [currentIndex, stage]);
-
   useEffect(() => {
-    if (stage === 'complete' || isAnswered) return;
+    if (isLoading || stage === 'complete' || isAnswered) return;
     if (timeLeft === 0) {
       if (stage === 'photos') handleMapSubmit();
       else handleAnswer('');
@@ -60,7 +79,7 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
     }
     const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
     return () => clearInterval(timer);
-  }, [timeLeft, isAnswered, stage]);
+  }, [timeLeft, isAnswered, stage, isLoading]);
 
   const currentQ = stage === 'capitals' ? questions.capitals[currentIndex] : stage === 'photos' ? questions.photos[currentIndex] : questions.trivias[currentIndex];
 
@@ -141,7 +160,13 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
 
         <div className="flex-1 relative bg-slate-900 flex flex-col items-center justify-center overflow-hidden w-full h-full">
           
-          {stage === 'complete' ? (
+          {isLoading ? (
+            <div className="text-center text-white p-8">
+              <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <h3 className="text-2xl font-black tracking-wide">GENERATING DYNAMIC RUN...</h3>
+              <p className="text-slate-400 text-sm mt-2">Fetching live questions from global databases</p>
+            </div>
+          ) : stage === 'complete' ? (
             <div className="text-center z-10 bg-white p-12 rounded-3xl shadow-2xl m-4">
               <h2 className="text-5xl font-black mb-4 text-slate-900">RUN COMPLETE</h2>
               <div className="text-7xl font-black text-blue-600 mb-2">{score} <span className="text-3xl text-slate-400">XP</span></div>
@@ -153,17 +178,8 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
               {/* PHOTO MODE */}
               {stage === 'photos' && currentQ && (
                 <div className="absolute inset-0 w-full h-full bg-slate-950 flex flex-col items-center justify-center p-4 pb-48 sm:pb-4">
-                  
-                  {/* PROXY IMAGE FETCHING */}
                   <img 
-                    src={
-                      imgFailover === 0 ? `/api/image-proxy?url=${encodeURIComponent((currentQ as PhotoQuestion).imageUrl)}`
-                      : imgFailover === 1 ? `/api/image-proxy?url=${encodeURIComponent((currentQ as PhotoQuestion).fallbackUrl)}`
-                      : `https://placehold.co/1200x800/0f172a/e2e8f0?text=${encodeURIComponent('ALL SERVERS BLOCKED\n\nClue:\n' + (currentQ as PhotoQuestion).clue)}`
-                    }
-                    onError={() => {
-                      if (imgFailover < 2) setImgFailover(prev => prev + 1);
-                    }}
+                    src={(currentQ as PhotoQuestion).imageUrl}
                     alt="Location" 
                     className="w-full h-full object-contain rounded-xl shadow-2xl" 
                   />
