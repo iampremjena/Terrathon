@@ -136,22 +136,38 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
     setTimeout(advanceNextQuestion, 4000);
   };
 
-  const advanceNextQuestion = () => {
-    setIsAnswered(false); setSelectedOption(null); setPinDrop(null); setMapResult(null); setIsMapExpanded(false); setTimeLeft(20);
+  // Inside components/GameRunner.tsx
 
-    if (currentIndex + 1 < activeQuestions.length) {
-      setCurrentIndex((prev) => prev + 1);
-    } else {
-      setCurrentIndex(0);
-      if (mode === 'terrathon_official') {
-        if (stage === 'capitals' && questions.photos.length > 0) setStage('photos');
-        else if (stage === 'photos' && questions.trivias.length > 0) setStage('trivias');
-        else finishRun();
-      } else { 
-        finishRun(); 
+const advanceNextQuestion = () => {
+  setIsAnswered(false); 
+  setSelectedOption(null); 
+  setPinDrop(null); 
+  setMapResult(null); 
+  setIsMapExpanded(false); 
+
+  const activeList = stage === 'capitals' ? questions.capitals : stage === 'photos' ? questions.photos : questions.trivias;
+
+  if (currentIndex + 1 < activeList.length) {
+    setCurrentIndex((prev) => prev + 1);
+    // Set 60 seconds if advancing into photo/video stage, 20s for others
+    setTimeLeft(stage === 'photos' ? 60 : 20);
+  } else {
+    setCurrentIndex(0);
+    if (mode === 'terrathon_official') {
+      if (stage === 'capitals' && questions.photos.length > 0) {
+        setStage('photos');
+        setTimeLeft(60); // 60 seconds for Stage 2
+      } else if (stage === 'photos' && questions.trivias.length > 0) {
+        setStage('trivias');
+        setTimeLeft(20); // 20 seconds for Stage 3
+      } else {
+        finishRun();
       }
+    } else { 
+      finishRun(); 
     }
-  };
+  }
+};
 
   const finishRun = async () => {
     setStage('complete');
