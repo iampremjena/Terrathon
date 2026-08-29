@@ -91,39 +91,94 @@ async function fetchCapitals() {
 // ----------------------------------------------------------------------------
 // STAGE 2: Dynamic Photos (Direct High-Speed Unsplash CDN Links)
 // ----------------------------------------------------------------------------
+// Replace the Stage 2 Video Walkthrough fetcher in app/api/questions/route.ts:
+
 async function fetchPhotos() {
-  const LANDMARKS = [
-    { name: "Eiffel Tower", country: "France", lat: 48.8584, lng: 2.2945, img: "https://images.unsplash.com/photo-1511739001486-6bfe10ce785f?w=1200&q=80" },
-    { name: "Taj Mahal", country: "India", lat: 27.1751, lng: 78.0421, img: "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=1200&q=80" },
-    { name: "Colosseum", country: "Italy", lat: 41.8902, lng: 12.4922, img: "https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=1200&q=80" },
-    { name: "Statue of Liberty", country: "USA", lat: 40.6892, lng: -74.0445, img: "https://images.unsplash.com/photo-1605130284535-11dd9ede6523?w=1200&q=80" },
-    { name: "Big Ben", country: "UK", lat: 51.5007, lng: -0.1246, img: "https://images.unsplash.com/photo-1529655683826-aba9b3e77383?w=1200&q=80" },
-    { name: "Sydney Opera House", country: "Australia", lat: -33.8568, lng: 151.2153, img: "https://images.unsplash.com/photo-1624138784614-87fd1b6528f8?w=1200&q=80" },
-    { name: "Machu Picchu", country: "Peru", lat: -13.1631, lng: -72.5450, img: "https://images.unsplash.com/photo-1526392060635-9d6019884377?w=1200&q=80" },
-    { name: "Burj Khalifa", country: "UAE", lat: 25.1972, lng: 55.2744, img: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1200&q=80" },
-    { name: "Mount Fuji", country: "Japan", lat: 35.3606, lng: 138.7274, img: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=1200&q=80" },
-    { name: "Pyramids of Giza", country: "Egypt", lat: 29.9792, lng: 31.1342, img: "https://images.unsplash.com/photo-1503177119275-0aa32b3a9368?w=1200&q=80" },
-    { name: "Christ the Redeemer", country: "Brazil", lat: -22.9519, lng: -43.2105, img: "https://images.unsplash.com/photo-1594741158704-5a784b8e59fb?w=1200&q=80" },
-    { name: "Sagrada Familia", country: "Spain", lat: 41.4036, lng: 2.1744, img: "https://images.unsplash.com/photo-1583778176476-4a8b02a64c01?w=1200&q=80" },
-    { name: "Golden Gate Bridge", country: "USA", lat: 37.8199, lng: -122.4783, img: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=1200&q=80" },
-    { name: "Neuschwanstein Castle", country: "Germany", lat: 47.5576, lng: 10.7498, img: "https://images.unsplash.com/photo-1534313314376-a72289b6181e?w=1200&q=80" },
-    { name: "Petra", country: "Jordan", lat: 30.3285, lng: 35.4444, img: "https://images.unsplash.com/photo-1579606030136-58a011a6878e?w=1200&q=80" },
-    { name: "Acropolis of Athens", country: "Greece", lat: 37.9715, lng: 23.7257, img: "https://images.unsplash.com/photo-1555993539-1732b0258235?w=1200&q=80" },
-    { name: "Chichen Itza", country: "Mexico", lat: 20.6843, lng: -88.5678, img: "https://images.unsplash.com/photo-1518638150340-f706e86654de?w=1200&q=80" },
-    { name: "Bran Castle", country: "Romania", lat: 45.5149, lng: 25.3672, img: "https://images.unsplash.com/photo-1580837119756-563d608dd119?w=1200&q=80" }
+  const VIDEO_WALKTHROUGHS = [
+    { 
+      name: "Shibuya Crossing, Tokyo", 
+      country: "Japan", 
+      lat: 35.6595, 
+      lng: 139.7004, 
+      youtubeId: "h1sK6j0N4_Y", 
+      startTime: 30,
+      clue: "Massive neon-lit pedestrian intersection in Asia" 
+    },
+    { 
+      name: "Eiffel Tower Promenade, Paris", 
+      country: "France", 
+      lat: 48.8584, 
+      lng: 2.2945, 
+      youtubeId: "XqZsoesa55w", 
+      startTime: 45,
+      clue: "Iconic iron lattice landmark along the Seine River" 
+    },
+    { 
+      name: "Times Square, New York City", 
+      country: "USA", 
+      lat: 40.7580, 
+      lng: -73.9855, 
+      youtubeId: "mRe-514tGMg", 
+      startTime: 15,
+      clue: "Major commercial intersection in Midtown Manhattan" 
+    },
+    { 
+      name: "Venice Canals & St. Mark's Square", 
+      country: "Italy", 
+      lat: 45.4342, 
+      lng: 12.3385, 
+      youtubeId: "kRcAaqX4U1Y", 
+      startTime: 60,
+      clue: "Historic island city connected by grand canals" 
+    },
+    { 
+      name: "Amsterdam Canal Belt", 
+      country: "Netherlands", 
+      lat: 52.3676, 
+      lng: 4.8909, 
+      youtubeId: "1-J_08U6S64", 
+      startTime: 20,
+      clue: "Capital city famous for narrow gabled houses and bicycle paths" 
+    },
+    { 
+      name: "Piccadilly Circus, London", 
+      country: "UK", 
+      lat: 51.5100, 
+      lng: -0.1342, 
+      youtubeId: "H4v7gWd5_jE", 
+      startTime: 40,
+      clue: "Historic junction connecting Regent Street and Shaftesbury Avenue" 
+    },
+    { 
+      name: "Santorini Oia Walkway", 
+      country: "Greece", 
+      lat: 36.4618, 
+      lng: 25.3753, 
+      youtubeId: "8x8X1dG-S_M", 
+      startTime: 10,
+      clue: "Whitewashed Aegean village built into volcanic cliffs" 
+    },
+    { 
+      name: "Dubai Marina Promenade", 
+      country: "UAE", 
+      lat: 25.0772, 
+      lng: 55.1390, 
+      youtubeId: "q1k8xO9bXyE", 
+      startTime: 50,
+      clue: "Ultra-modern waterfront district surrounded by skyscrapers" 
+    }
   ];
 
-  // Randomly shuffle the pool and take 10 unique landmarks on every run
-  const selected = shuffle(LANDMARKS).slice(0, 10);
+  const selected = shuffle(VIDEO_WALKTHROUGHS).slice(0, 10);
 
   return selected.map((item, idx) => ({
-    id: `photo_${idx}`,
+    id: `video_${idx}`,
     locationName: item.name,
     country: item.country,
-    imageUrl: item.img,
-    fallbackUrl: item.img,
+    youtubeId: item.youtubeId,
+    startTime: item.startTime,
     coordinates: { lat: item.lat, lng: item.lng },
-    clue: `Located in ${item.country}`
+    clue: item.clue
   }));
 }
 

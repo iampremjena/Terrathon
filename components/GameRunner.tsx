@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { fetchAllRunQuestions, CapitalQuestion, PhotoQuestion, TriviaQuestion } from '@/lib/questions';
+import { fetchAllRunQuestions, CapitalQuestion, TriviaQuestion } from '@/lib/questions';
 import { supabase } from '@/lib/supabase';
 
-// Dynamically import the map to avoid SSR issues
+// Dynamically import the map component to disable Server-Side Rendering (SSR) for Leaflet
 const MapPinDrop = dynamic(() => import('./MapPinDrop'), { ssr: false });
 
 function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -17,6 +17,16 @@ function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   return Math.round(R * c);
 }
 
+export interface VideoQuestion {
+  id: string;
+  locationName: string;
+  country: string;
+  youtubeId: string;
+  startTime: number;
+  coordinates: { lat: number; lng: number };
+  clue: string;
+}
+
 interface GameRunnerProps { 
   mode: 'capital' | 'photoguessr' | 'trivia' | 'terrathon_official'; 
   userId: string | null; 
@@ -26,7 +36,7 @@ interface GameRunnerProps {
 
 export default function GameRunner({ mode, userId, runnerName, onClose }: GameRunnerProps) {
   const [stage, setStage] = useState<'capitals' | 'photos' | 'trivias' | 'complete'>('capitals');
-  const [questions, setQuestions] = useState<{ capitals: CapitalQuestion[]; photos: PhotoQuestion[]; trivias: TriviaQuestion[]; }>({ capitals: [], photos: [], trivias: [] });
+  const [questions, setQuestions] = useState<{ capitals: CapitalQuestion[]; photos: VideoQuestion[]; trivias: TriviaQuestion[]; }>({ capitals: [], photos: [], trivias: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -48,7 +58,6 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
       try {
         const data = await fetchAllRunQuestions(mode);
 
-        // Verify that arrays actually exist before setting state
         setQuestions({
           capitals: Array.isArray(data?.capitals) ? data.capitals : [],
           photos: Array.isArray(data?.photos) ? data.photos : [],
@@ -83,7 +92,6 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
     return () => clearInterval(timer);
   }, [timeLeft, isAnswered, stage, isLoading]);
 
-  // Safely get the active question based on the current stage
   const activeQuestions = stage === 'capitals' ? questions.capitals : stage === 'photos' ? questions.photos : stage === 'trivias' ? questions.trivias : [];
   const currentQ = activeQuestions[currentIndex];
 
@@ -116,7 +124,7 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
       return;
     }
 
-    const actual = (currentQ as PhotoQuestion).coordinates;
+    const actual = (currentQ as VideoQuestion).coordinates;
     const dist = getDistanceKm(actual.lat, actual.lng, pinDrop.lat, pinDrop.lng);
     let pts = 0;
     if (dist <= 100) pts = 500; else if (dist < 4000) pts = Math.floor(500 - (dist / 4000) * 500);
@@ -167,8 +175,11 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
         <div className="bg-slate-100 p-4 border-b-2 border-slate-200 flex justify-between items-center text-slate-800 z-10 relative shadow-md">
           <div><div className="text-xs font-black text-slate-400 uppercase tracking-widest">{stage} Stage</div><div className="text-2xl font-black">{timeLeft}s</div></div>
           
-          {/* TypeScript Fix applied here */}
-          <div className="text-center hidden sm:block"><div className="text-xs font-black text-slate-400 uppercase tracking-widest">Question {currentIndex + 1} / {stage !== 'complete' ? questions[stage]?.length : 10}</div></div>
+          <div className="text-center hidden sm:block">
+            <div className="text-xs font-black text-slate-400 uppercase tracking-widest">
+              Question {currentIndex + 1} / {stage !== 'complete' ? questions[stage]?.length : 10}
+            </div>
+          </div>
           
           <div className="text-right flex items-center gap-4">
             <div><div className="text-xs font-black text-slate-400 uppercase tracking-widest">Score</div><div className="text-2xl font-black text-blue-600">{score}</div></div>
@@ -186,7 +197,6 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
             </div>
           ) : stage !== 'complete' && (!activeQuestions || activeQuestions.length === 0) ? (
             
-            /* SAFETY RENDER CHECK: Shows if API failed to return data */
             <div className="text-center z-10 bg-slate-900 border border-slate-700 p-10 rounded-3xl shadow-2xl max-w-md w-full mx-4">
               <h3 className="text-3xl font-black mb-3 text-rose-500">Run Failed</h3>
               <p className="text-slate-400 text-sm mb-8 font-semibold">The global API databases dropped the connection. Please try starting the run again.</p>
@@ -207,47 +217,60 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
             </div>
           ) : (
             <>
-              {/* PHOTO MODE */}
+              {/* STAGE 2: VIDEO WALKTHROUGH MODE */}
               {stage === 'photos' && currentQ && (
-                <div className="absolute inset-0 w-full h-full bg-slate-950 flex flex-col items-center justify-center p-4 pb-48 sm:pb-4">
-                  <img 
-                    src={(currentQ as PhotoQuestion).imageUrl}
-                    alt="Location" 
-                    className="w-full h-full object-contain rounded-xl shadow-2xl" 
-                  />
+                <div className="absolute inset-0 w-full h-full bg-black flex flex-col items-center justify-center overflow-hidden">
                   
-                  {/* Thumbnail Map */}
+                  {/* Embedded Background YouTube Player */}
+                  <div className="relative w-full h-full pointer-events-none scale-125">
+                    <iframe
+                      src={`https://www.youtube-nocookie.com/embed/${(currentQ as VideoQuestion).youtubeId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${(currentQ as VideoQuestion).youtubeId}&start=${(currentQ as VideoQuestion).startTime || 0}&enablejsapi=1&rel=0&modestbranding=1`}
+                      title="Walkthrough Video"
+                      className="w-full h-full object-cover border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    />
+                  </div>
+
+                  {/* Streaming Badge */}
+                  <div className="absolute top-6 left-6 bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-xl border border-slate-700 text-white font-bold text-xs tracking-wider uppercase flex items-center gap-2 z-20">
+                    <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></span>
+                    LIVE WALKTHROUGH STREAM
+                  </div>
+
+                  {/* Thumbnail Map Button */}
                   {!isMapExpanded && !isAnswered && (
                     <div 
                       className="absolute bottom-6 sm:right-6 w-[90%] sm:w-80 h-40 sm:h-56 border-4 border-white shadow-[0_10px_40px_rgba(0,0,0,0.8)] rounded-2xl overflow-hidden cursor-pointer hover:scale-105 transition-transform z-20 group"
                       onClick={() => setIsMapExpanded(true)}
                     >
                       <div className="absolute inset-0 bg-slate-900/70 flex items-center justify-center text-white font-black text-lg z-10 group-hover:bg-slate-900/90 transition-all text-center p-4">
-                        📍 CLICK TO OPEN MAP
+                        📍 OPEN MAP TO GUESS
                       </div>
-                      <div className="w-full h-full pointer-events-none opacity-40 blur-sm"><MapPinDrop onPinDrop={() => {}} isExpanded={false} /></div>
+                      <div className="w-full h-full pointer-events-none opacity-40 blur-sm">
+                        <MapPinDrop onPinDrop={() => {}} isExpanded={false} />
+                      </div>
                     </div>
                   )}
 
-                  {/* Result Overlay */}
+                  {/* Distance Results Overlay */}
                   {isAnswered && mapResult && (
                     <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-6 animate-in fade-in zoom-in duration-300">
                       <div className="text-6xl sm:text-8xl font-black text-slate-900 mb-4">{mapResult.distance.toLocaleString()} <span className="text-4xl">km</span></div>
                       <div className="text-4xl font-bold text-green-600 mb-6">+{mapResult.pts} Points</div>
-                      <div className="text-xl font-bold text-slate-500 uppercase tracking-widest bg-slate-100 p-4 rounded-xl">Target: {(currentQ as PhotoQuestion).locationName}</div>
+                      <div className="text-xl font-bold text-slate-500 uppercase tracking-widest bg-slate-100 p-4 rounded-xl">Target: {(currentQ as VideoQuestion).locationName}</div>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* EXPANDED CENTER MAP OVERLAY */}
+              {/* EXPANDED MAP OVERLAY */}
               {isMapExpanded && (
                 <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center p-2 sm:p-8 animate-in fade-in duration-200">
                   <div className="bg-slate-800 sm:rounded-3xl shadow-2xl w-full h-full sm:max-w-6xl sm:max-h-[85vh] flex flex-col overflow-hidden border-2 border-slate-700">
                     <div className="flex justify-between items-center p-4 sm:p-6 bg-slate-900 border-b border-slate-700">
                       <div>
                         <h3 className="text-white font-black text-xl sm:text-2xl">PINPOINT LOCATION</h3>
-                        <p className="text-slate-400 font-bold text-xs sm:text-sm mt-1">Clue: {(currentQ as PhotoQuestion).clue}</p>
+                        <p className="text-slate-400 font-bold text-xs sm:text-sm mt-1">Clue: {(currentQ as VideoQuestion).clue}</p>
                       </div>
                       <button onClick={() => setIsMapExpanded(false)} className="text-slate-400 hover:text-white bg-slate-800 p-3 rounded-xl font-black transition">✕ CLOSE</button>
                     </div>
@@ -270,7 +293,7 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
                 </div>
               )}
 
-              {/* TRIVIA / CAPITALS */}
+              {/* TRIVIA / CAPITALS STAGES */}
               {stage !== 'photos' && currentQ && 'options' in currentQ && (
                 <div className="w-full max-w-4xl p-6 sm:p-10 bg-white rounded-3xl shadow-2xl z-10 m-4 border-4 border-slate-100">
                   <h3 className="text-2xl sm:text-4xl font-black text-slate-800 text-center mb-8 sm:mb-12 leading-tight">

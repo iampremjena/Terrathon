@@ -1,34 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
-import L from 'leaflet';
+import React, { useState } from 'react';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 
+// Fix missing Leaflet marker icons in Next.js environment
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
   iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
 });
 
-interface MapPinDropProps {
-  onPinDrop: (lat: number, lng: number) => void;
-  isExpanded: boolean;
-}
-
-// Automatically fixes Leaflet's internal sizing when the map container expands
-function MapResizer({ isExpanded }: { isExpanded: boolean }) {
-  const map = useMap();
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      map.invalidateSize();
-    }, 300);
-    return () => clearTimeout(timeout);
-  }, [isExpanded, map]);
-  return null;
-}
-
+// Event handler component to capture clicks and place user pin
 function LocationMarker({ onPinDrop }: { onPinDrop: (lat: number, lng: number) => void }) {
   const [position, setPosition] = useState<L.LatLng | null>(null);
 
@@ -42,25 +27,25 @@ function LocationMarker({ onPinDrop }: { onPinDrop: (lat: number, lng: number) =
   return position === null ? null : <Marker position={position} />;
 }
 
+interface MapPinDropProps {
+  onPinDrop: (lat: number, lng: number) => void;
+  isExpanded: boolean;
+}
+
 export default function MapPinDrop({ onPinDrop, isExpanded }: MapPinDropProps) {
-  const [isMounted, setIsMounted] = useState(false);
-  useEffect(() => setIsMounted(true), []);
-
-  if (!isMounted) return <div className="h-full w-full bg-slate-800 animate-pulse rounded-2xl" />;
-
   return (
     <MapContainer 
       center={[20, 0]} 
-      zoom={isExpanded ? 3 : 1} 
+      zoom={isExpanded ? 2 : 1} 
       scrollWheelZoom={true} 
-      className="h-full w-full z-0"
+      className="w-full h-full z-0"
     >
-      {/* CartoDB Voyager forces English labels globally */}
+      {/* High-definition, open-source CartoDB Voyager tiles (No API key watermarks) */}
       <TileLayer
-        attribution='&copy; <a href="https://carto.com/">Carto</a>'
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+        maxZoom={19}
       />
-      <MapResizer isExpanded={isExpanded} />
       <LocationMarker onPinDrop={onPinDrop} />
     </MapContainer>
   );
