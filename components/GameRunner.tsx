@@ -36,32 +36,30 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
 
   const initRef = useRef(false);
 
- // Inside components/GameRunner.tsx, update the useEffect question loader:
+  useEffect(() => {
+    async function loadQuestions() {
+      setIsLoading(true);
+      const data = await fetchAllRunQuestions(mode);
 
-useEffect(() => {
-  async function loadQuestions() {
-    setIsLoading(true);
-    const data = await fetchAllRunQuestions(mode);
+      setQuestions({
+        capitals: data.capitals || [],
+        photos: data.photos || [],
+        trivias: data.trivias || []
+      });
 
-    setQuestions({
-      capitals: data.capitals || [],
-      photos: data.photos || [],
-      trivias: data.trivias || []
-    });
+      if (mode === 'capital') setStage('capitals');
+      else if (mode === 'photoguessr') setStage('photos');
+      else if (mode === 'trivia') setStage('trivias');
+      else setStage('capitals');
 
-    if (mode === 'capital') setStage('capitals');
-    else if (mode === 'photoguessr') setStage('photos');
-    else if (mode === 'trivia') setStage('trivias');
-    else setStage('capitals');
+      setIsLoading(false);
+    }
 
-    setIsLoading(false);
-  }
-
-  if (!initRef.current) {
-    loadQuestions();
-    initRef.current = true;
-  }
-}, [mode]);
+    if (!initRef.current) {
+      loadQuestions();
+      initRef.current = true;
+    }
+  }, [mode]);
 
   useEffect(() => {
     if (isLoading || stage === 'complete' || isAnswered) return;
@@ -144,7 +142,7 @@ useEffect(() => {
         {/* Game Header */}
         <div className="bg-slate-100 p-4 border-b-2 border-slate-200 flex justify-between items-center text-slate-800 z-10 relative shadow-md">
           <div><div className="text-xs font-black text-slate-400 uppercase tracking-widest">{stage} Stage</div><div className="text-2xl font-black">{timeLeft}s</div></div>
-          <div className="text-center hidden sm:block"><div className="text-xs font-black text-slate-400 uppercase tracking-widest">Question {currentIndex + 1} / 10</div></div>
+          <div className="text-center hidden sm:block"><div className="text-xs font-black text-slate-400 uppercase tracking-widest">Question {currentIndex + 1} / {questions[stage]?.length || 10}</div></div>
           <div className="text-right flex items-center gap-4">
             <div><div className="text-xs font-black text-slate-400 uppercase tracking-widest">Score</div><div className="text-2xl font-black text-blue-600">{score}</div></div>
             <button onClick={onClose} className="bg-slate-800 text-white px-4 py-3 rounded-xl text-xs font-bold hover:bg-rose-600 transition">QUIT</button>
@@ -156,8 +154,8 @@ useEffect(() => {
           {isLoading ? (
             <div className="text-center text-white p-8">
               <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <h3 className="text-2xl font-black tracking-wide">GENERATING DYNAMIC RUN...</h3>
-              <p className="text-slate-400 text-sm mt-2">Fetching live questions from global databases</p>
+              <h3 className="text-2xl font-black tracking-wide">GENERATING RUN...</h3>
+              <p className="text-slate-400 text-sm mt-2">Connecting to backend server engine</p>
             </div>
           ) : stage === 'complete' ? (
             <div className="text-center z-10 bg-white p-12 rounded-3xl shadow-2xl m-4">
