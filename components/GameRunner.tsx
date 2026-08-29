@@ -142,8 +142,7 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
         {/* Game Header */}
         <div className="bg-slate-100 p-4 border-b-2 border-slate-200 flex justify-between items-center text-slate-800 z-10 relative shadow-md">
           <div><div className="text-xs font-black text-slate-400 uppercase tracking-widest">{stage} Stage</div><div className="text-2xl font-black">{timeLeft}s</div></div>
-          <div className="text-center hidden sm:block"><div className="text-xs font-black text-slate-400 uppercase tracking-widest">Question {currentIndex + 1} / {questions[stage]?.length || 10}</div></div>
-          <div className="text-right flex items-center gap-4">
+          <div className="text-center hidden sm:block"><div className="text-xs font-black text-slate-400 uppercase tracking-widest">Question {currentIndex + 1} / {stage !== 'complete' ? questions[stage]?.length : 10}</div></div><div className="text-right flex items-center gap-4">
             <div><div className="text-xs font-black text-slate-400 uppercase tracking-widest">Score</div><div className="text-2xl font-black text-blue-600">{score}</div></div>
             <button onClick={onClose} className="bg-slate-800 text-white px-4 py-3 rounded-xl text-xs font-bold hover:bg-rose-600 transition">QUIT</button>
           </div>
