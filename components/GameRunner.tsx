@@ -2,14 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { 
-  fetchDynamicCapitals, 
-  fetchDynamicPhotoQuestions, 
-  fetchDynamicTriviaQuestions, 
-  CapitalQuestion, 
-  PhotoQuestion, 
-  TriviaQuestion 
-} from '@/lib/questions';
+import { fetchAllRunQuestions, CapitalQuestion, PhotoQuestion, TriviaQuestion } from '@/lib/questions';
 import { supabase } from '@/lib/supabase';
 
 const MapPinDrop = dynamic(() => import('./MapPinDrop'), { ssr: false });
@@ -43,32 +36,32 @@ export default function GameRunner({ mode, userId, runnerName, onClose }: GameRu
 
   const initRef = useRef(false);
 
-  useEffect(() => {
-    async function loadQuestions() {
-      setIsLoading(true);
-      let caps: CapitalQuestion[] = [];
-      let photos: PhotoQuestion[] = [];
-      let trivs: TriviaQuestion[] = [];
+ // Inside components/GameRunner.tsx, update the useEffect question loader:
 
-      if (mode === 'capital' || mode === 'terrathon_official') caps = await fetchDynamicCapitals();
-      if (mode === 'photoguessr' || mode === 'terrathon_official') photos = await fetchDynamicPhotoQuestions();
-      if (mode === 'trivia' || mode === 'terrathon_official') trivs = await fetchDynamicTriviaQuestions();
+useEffect(() => {
+  async function loadQuestions() {
+    setIsLoading(true);
+    const data = await fetchAllRunQuestions(mode);
 
-      setQuestions({ capitals: caps, photos, trivias: trivs });
+    setQuestions({
+      capitals: data.capitals || [],
+      photos: data.photos || [],
+      trivias: data.trivias || []
+    });
 
-      if (mode === 'capital') setStage('capitals');
-      else if (mode === 'photoguessr') setStage('photos');
-      else if (mode === 'trivia') setStage('trivias');
-      else setStage('capitals');
+    if (mode === 'capital') setStage('capitals');
+    else if (mode === 'photoguessr') setStage('photos');
+    else if (mode === 'trivia') setStage('trivias');
+    else setStage('capitals');
 
-      setIsLoading(false);
-    }
+    setIsLoading(false);
+  }
 
-    if (!initRef.current) {
-      loadQuestions();
-      initRef.current = true;
-    }
-  }, [mode]);
+  if (!initRef.current) {
+    loadQuestions();
+    initRef.current = true;
+  }
+}, [mode]);
 
   useEffect(() => {
     if (isLoading || stage === 'complete' || isAnswered) return;
