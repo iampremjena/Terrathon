@@ -42,7 +42,9 @@ export async function GET(request: Request) {
     // ============================================================================
     const countriesRes = await fetch('https://restcountries.com/v3.1/all?fields=name,capital,region,latlng', { headers });
     const countriesData = await countriesRes.json();
-    const validCountries = countriesData.filter((c: any) => c.capital && c.capital.length > 0 && c.latlng && c.latlng.length === 2);
+    
+    // EXPLICITLY TYPE AS any[] TO PREVENT TYPESCRIPT ERRORS
+    const validCountries: any[] = countriesData.filter((c: any) => c.capital && c.capital.length > 0 && c.latlng && c.latlng.length === 2);
     const allCapitalsList = validCountries.map((c: any) => c.capital[0]);
 
     if (mode === 'capital' || mode === 'terrathon_official') {
@@ -64,7 +66,8 @@ export async function GET(request: Request) {
     // 2. FETCH DYNAMIC PHOTOS (Wikipedia Image Scraping via Live Coordinates)
     // ============================================================================
     if (mode === 'photoguessr' || mode === 'terrathon_official') {
-      const shuffledForPhotos = shuffle(validCountries);
+      // EXPLICITLY TYPE AS any[] TO FIX TS18046
+      const shuffledForPhotos: any[] = shuffle(validCountries);
       
       // Keep fetching Wikipedia images until we have exactly 10 valid photos
       for (const country of shuffledForPhotos) {
